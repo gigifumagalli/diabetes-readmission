@@ -1,0 +1,20 @@
+[project]
+name = "diabetes-readmission"
+version = "0.1.0"
+description = "Predict 30-day hospital readmission for diabetic patients (UCI Diabetes 130-US Hospitals)"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "fastapi>=0.162.0",
+    "numpy>=2.4.6",
+    "pandas>=3.1.0",
+    "scikit-learn==1.7.2",
+    "uvicorn>=0.54.0",
+    "xgboost>=3.2.0",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.4.0",
+    "matplotlib>=3.11.2",
+    "seaborn>=0.13.2",
+]
