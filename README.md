@@ -6,10 +6,14 @@ Predict whether a diabetic patient will be readmitted to hospital **within 30 da
 
 ## Problem
 
-Hospitals in the US are penalised for early readmissions, and a readmission within 30 days is a cost for the hospital and a risk for the patient. A model that flags high-risk patients at discharge lets staff target follow-up calls, medication reviews or a later discharge at the patients who need it most.
+Hospitals in the US are penalised for early readmissions (Hospital Readmissions Reduction Program), and a readmission within 30 days is often a sign that the patient left hospital without enough support.
 
-- **Target:** `readmitted == '<30'` (binary; about 11% of encounters)
-- **Metric:** ROC AUC (the classes are imbalanced, and the model ranks patients for follow-up)
+**Use case.** On the day of discharge, the model gives each diabetic patient a probability of being readmitted within 30 days. The hospital's care-transition team (nurses, case managers, pharmacists) cannot call, visit or review the medication of every patient, so it uses the score to rank the day's discharges and spend its limited capacity on the patients most likely to come back.
+
+- **Target:** `readmitted == '<30'` (binary; 9.0% of the encounters after scoping). Readmissions after 30 days count as negative.
+- **Metric:** ROC AUC, because the team acts on a ranking and the classes are imbalanced (always predicting "no readmission" is already 91% accurate).
+- **Features:** only information available at discharge (demographics, admission data, length of stay, lab results, medications and their changes during the stay, diagnoses).
+- **Bar in practice:** hospitals already use simple clinical scores such as the LACE index for this task.
 
 ## Data
 
@@ -32,6 +36,14 @@ Following the source paper:
 1. **One encounter per patient**, so the same patient cannot appear in both training and validation data.
 2. **Drop encounters that ended in death or hospice** (`discharge_disposition_id` 11, 13, 14, 19, 20, 21): these patients cannot be readmitted.
 3. **Group the ICD-9 diagnosis codes** (`diag_1`, `diag_2`, `diag_3`) into about 9 disease categories.
+
+Rule 1 uses the lowest `encounter_id` as the first encounter (the data has no dates; the notebook checks that the id order is consistent with time order). The 3 rows with `gender` = `Unknown/Invalid` are also dropped. Result: **69,970 encounters**, one per patient (the paper reports 69,984; the notebook explains the difference).
+
+## Limitations
+
+- **The model predicts risk; it does not estimate the effect of any intervention.** It says who is likely to come back, not whether a follow-up call would prevent it. That is a causal question, the one the source paper addresses.
+- **Readmission depends on factors that are not in the data** (support at home, adherence to treatment, socio-economic situation), which limits the achievable performance.
+- **The data covers 1999–2008.** Clinical practice and coding have changed since (the US moved from ICD-9 to ICD-10 in 2015), so a real deployment would need retraining on recent data.
 
 ## Project structure
 
