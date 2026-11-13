@@ -1,0 +1,40 @@
+# The service as a Kubernetes Deployment: Kubernetes keeps the requested number of pods running and replaces any that fail
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: readmission
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: readmission
+  template:
+    metadata:
+      labels:
+        app: readmission  # the Service finds the pods by this label
+    spec:
+      containers:
+        - name: readmission
+          image: diabetes-readmission:v1
+          imagePullPolicy: IfNotPresent  # the image is loaded into kind, not pulled from a registry
+          ports:
+            - containerPort: 9696
+          resources:
+            requests:  # reserved for the pod when Kubernetes places it
+              memory: "384Mi"  # measured: ~340 MB with the model loaded
+              cpu: "250m"
+            limits:  # the pod is restarted if it uses more memory than this
+              memory: "1Gi"
+              cpu: "1"
+          readinessProbe:  # send traffic only once the model is loaded
+            httpGet:
+              path: /health
+              port: 9696
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:  # restart the container if /health stops answering
+            httpGet:
+              path: /health
+              port: 9696
+            initialDelaySeconds: 15
+            periodSeconds: 20

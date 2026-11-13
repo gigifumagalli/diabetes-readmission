@@ -95,12 +95,39 @@ curl -X POST localhost:9696/predict -H "Content-Type: application/json" -d @exam
 Or open <http://localhost:9696/docs> and use "Try it out" on `/predict`: the request body is pre-filled with the same
 patient. `GET /health` returns the SHA-256 of the loaded model file.
 
+## Deploy to Kubernetes
+
+The same image runs on a local Kubernetes cluster created with [kind](https://kind.sigs.k8s.io/) (Kubernetes in
+Docker). `k8s/deployment.yaml` runs the service in one pod, with health checks on `/health` and memory sized from a
+measurement (about 340 MB with the model loaded); `k8s/service.yaml` gives the pods one stable address.
+
+```bash
+kind create cluster --name diabetes-readmission
+docker build -t diabetes-readmission:v1 .
+kind load docker-image diabetes-readmission:v1 --name diabetes-readmission   # copy the local image into the cluster
+kubectl apply -f k8s/
+kubectl rollout status deployment/readmission                                 # wait until the pod is ready
+kubectl port-forward service/readmission 9696:80                              # forward localhost:9696 to the service
+```
+
+In a second terminal, the same request as with Docker:
+
+```bash
+curl -X POST localhost:9696/predict -H "Content-Type: application/json" -d @examples/patient.json
+# {"readmission_probability":0.1562}
+```
+
+![Test of the service running on the kind cluster](images/k8s_test.png)
+
+To remove the cluster afterwards: `kind delete cluster --name diabetes-readmission`.
+
 ## Project structure
 
 ```text
 ├── data/raw/                  raw data (CC BY 4.0)
 ├── examples/patient.json      example request for the service
 ├── images/                    figures used in this README
+├── k8s/                       Kubernetes deployment and service (kind)
 ├── models/                    trained model (model.bin) and its metadata
 ├── notebooks/                 EDA and model selection
 ├── scripts/                   data download

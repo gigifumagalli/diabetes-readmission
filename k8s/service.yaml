@@ -1,0 +1,12 @@
+# One stable address in front of the pods; ClusterIP = reachable inside the cluster, from outside via kubectl port-forward
+apiVersion: v1
+kind: Service
+metadata:
+  name: readmission
+spec:
+  type: ClusterIP
+  selector:
+    app: readmission
+  ports:
+    - port: 80          # the Service's port
+      targetPort: 9696  # the container's port
