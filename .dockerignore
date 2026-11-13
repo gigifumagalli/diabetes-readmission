@@ -1,0 +1,9 @@
+# Only pyproject.toml, uv.lock, src/ and models/ are needed in the image
+.venv/
+.git/
+data/
+notebooks/
+images/
+tests/
+scripts/
+**/__pycache__/

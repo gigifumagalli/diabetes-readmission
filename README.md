@@ -74,10 +74,32 @@ without one is rejected with a 422 error naming the missing fields. The training
 fields, so the model has never seen a patient without them, and filling in a guessed value would silently change the
 risk it returns.
 
+## Run with Docker
+
+The image contains only the runtime dependencies, the package and the trained model (`models/model.bin`). It is about
+1.2 GB, most of it the CUDA libraries that the Linux `xgboost` wheel always includes; the CPU-only `xgboost-cpu` wheel
+would remove them but has no macOS build, so the same package is kept everywhere for now.
+
+```bash
+docker build -t diabetes-readmission .
+docker run -it --rm -p 9696:9696 diabetes-readmission
+```
+
+In a second terminal, score the example patient (a real patient from the test set):
+
+```bash
+curl -X POST localhost:9696/predict -H "Content-Type: application/json" -d @examples/patient.json
+# {"readmission_probability":0.1562}
+```
+
+Or open <http://localhost:9696/docs> and use "Try it out" on `/predict`: the request body is pre-filled with the same
+patient. `GET /health` returns the SHA-256 of the loaded model file.
+
 ## Project structure
 
 ```text
 ├── data/raw/                  raw data (CC BY 4.0)
+├── examples/patient.json      example request for the service
 ├── images/                    figures used in this README
 ├── models/                    trained model (model.bin) and its metadata
 ├── notebooks/                 EDA and model selection
@@ -87,6 +109,7 @@ risk it returns.
 │   ├── train.py               trains the final model and saves models/model.bin
 │   └── predict.py             FastAPI service
 ├── tests/                     unit tests (features) and API tests (service)
+├── Dockerfile                 service image
 ├── pyproject.toml             dependencies (uv)
 └── uv.lock                    locked versions
 ```
