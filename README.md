@@ -46,14 +46,49 @@ Rule 1 uses the lowest `encounter_id` as the first encounter (the data has no da
 - **Readmission depends on factors that are not in the data** (support at home, adherence to treatment, socio-economic situation), which limits the achievable performance.
 - **The data covers 1999–2008.** Clinical practice and coding have changed since (the US moved from ICD-9 to ICD-10 in 2015), so a real deployment would need retraining on recent data.
 
+## Prediction service
+
+`src/diabetes_readmission/predict.py` is a FastAPI service that scores one discharged patient per request. The request
+holds the raw fields of the hospital record; the service prepares them with the same code as training
+(`features.py`), so a patient sent to the API is treated exactly like the patients the model learned from.
+
+```mermaid
+flowchart TD
+    F[("models/model.bin<br/>loaded once at startup:<br/>fitted pipeline + kept-category lists")]
+
+    R["POST /predict<br/>one patient, 29 raw fields<br/>(ICD-9 codes, e.g. 250.42)"] --> V{"valid<br/>request?"}
+    V -- no --> E["422 error, naming each faulty field:<br/>required field missing<br/>value never seen in the dataset<br/>negative count, unknown field"]
+    V -- yes --> C["clean()<br/>ICD-9 code → disease group<br/>unused diagnosis slot → Absent<br/>race / specialty empty → Missing<br/>ID code of unknown meaning → Unknown"]
+    C --> M["merge_rare()<br/>category not in the saved lists → Other"]
+    M --> P["DictVectorizer + XGBoost"]
+    P --> O["200 OK<br/>readmission_probability: 0.1562"]
+
+    F -. kept-category lists .-> M
+    F -. fitted pipeline .-> P
+```
+
+**Required and optional fields.** `race`, `medical_specialty` and `diag_1` to `diag_3` may be left out or sent as
+`null`: they are often not recorded in the hospital data too (`medical_specialty` is empty for about half of the
+patients), so the model has learned what "not recorded" means for them. Every other field is required, and a request
+without one is rejected with a 422 error naming the missing fields. The training data has no missing values in those
+fields, so the model has never seen a patient without them, and filling in a guessed value would silently change the
+risk it returns.
+
 ## Project structure
 
 ```text
-├── data/raw/          raw data (CC BY 4.0)
-├── notebooks/         EDA and model selection
-├── scripts/           data download
-├── pyproject.toml     dependencies (uv)
-└── uv.lock            locked versions
+├── data/raw/                  raw data (CC BY 4.0)
+├── images/                    figures used in this README
+├── models/                    trained model (model.bin) and its metadata
+├── notebooks/                 EDA and model selection
+├── scripts/                   data download
+├── src/diabetes_readmission/
+│   ├── features.py            data preparation shared by training and the service
+│   ├── train.py               trains the final model and saves models/model.bin
+│   └── predict.py             FastAPI service
+├── tests/                     unit tests (features) and API tests (service)
+├── pyproject.toml             dependencies (uv)
+└── uv.lock                    locked versions
 ```
 
 ## Setup
@@ -61,5 +96,8 @@ Rule 1 uses the lowest `encounter_id` as the first encounter (the data has no da
 Requires [uv](https://docs.astral.sh/uv/).
 
 ```bash
-uv sync                # runtime + dev (notebook) dependencies
+uv sync                                                        # runtime + dev (notebook, tests) dependencies
+uv run python -m diabetes_readmission.train                    # retrain, print the test AUC, save models/model.bin
+uv run pytest -q                                               # unit and API tests
+uv run uvicorn diabetes_readmission.predict:app --port 9696    # start the service; try it at localhost:9696/docs
 ```
